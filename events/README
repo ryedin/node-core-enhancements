@@ -1,0 +1,80 @@
+#About this file
+
+Loading this file will enhance process.EventEmitter with a robust suppression API and a couple other nice little features.
+
+The suppression API is designed to enable halting 1, several, or all events on an emitter while OPTIONALLY
+buffering the events during the suppression period. Once .unsuppress() is called, the appropriate
+events are once again emitted, as well as re-emission of any buffered events.
+
+##Sample usages
+
+require("/path/to/this/file"); //after this, all EventEmitters will be enhanced
+var e = new process.EventEmitter();
+
+/*
+An evented system is highly useful for enabling many AOP/IOC scenarios. One thing that's missing
+from node's core event API in enabling these AOP/IOC scenarios is granular manipulation of
+the emission of the actual events. As it sits natively, any system state information that
+might dictate that all listeners of a particular event should _not_ execute is required
+to be propagated and managed within the scope of each and every listener. Wouldn't it be
+nice to be able to have aspects at the system/app level that can control this flow in 
+a manner that allows pure and clean separation of concerns? Enter the suppression API...
+
+Perhaps there is an emitter "e" in our app that fires a "log" event with log data, and
+we've designed this logging function to be carried out with event emitters because that
+enables hooking into those events from other modules and doing interesting things. Event
+emitters are just about the perfect candidate for such requirements.
+*/
+
+//here we've included a config module that is now able to turn logging on or off if desired
+if (config.logLevel == "off") {
+  e.suppress("log");
+}
+
+/*
+Or, we can invert control so that some monitoring or other "angel in the sky" module can
+mutate the workflow if needed without the event origination code needing to know about such
+concerns (such a pattern is usually made easier by using (beforeX, X, afterX) event sets)
+*/
+e.on("beforeShutdown", function() {  
+  if (shouldDelayShutdownForSomeReason) {
+    //uh oh, some state is dictating that an async task needs to complete before the actual shutdown.
+    //we can't actually stop the shutdown event from firing at the origination point without
+    //doing static analysis and re-writing the method, but we can suppress the event 
+    //and re-emit it when our work is done (since we've designed our system to rely on events for flow control)
+    e.suppress("shutdown", true); //true indicates the event should be buffered and re-emitted after suppression ends
+    doMyAsyncStuff(function() {
+      //ok, coast is clear now allow shutdown event (and re-emit it if it occured while async stuff was going on)
+      e.unsuppress("shutdown");
+    });
+  }
+});
+
+/*
+Another similar example of IOC might be a game in which the player's turn consists of 
+queuing up a bunch of commands for his avatar to perform (a sort of RTS game maybe). But maybe
+we also want to allow for the same individual commands to work real-time for some sort of
+zoomed in one-on-one combat view. We can design the flow control via emitters and simply queue events if we're
+in "strategy mode" and then let them through in real-time if in "real time mode". (yes, this
+is a contrived example, but it does illustrate an interesting use-case possibility)
+*/
+
+var player = new process.EventEmitter();
+if (inStrategyMode) {
+  player.suppress(null, true); //passing nothing or null in as the first param means suppress all events. true for 2nd param again means to buffer the events
+}
+
+//allow the moves to be picked by the actual player, which may result in various calls like this...
+player.emit("move", {x: 30, y: 5});
+player.emit("magic", {spell: "fireball", target: "orcs"});
+//etc... (and the above calls, if in real-time mode would immediately make the character take the action)
+//until finally the player presses the button indicating he's done setting his moves up, 
+//and then an .unsuppress call is issued, and all the queued events are emitted
+player.unsuppress(); //passing nothing or null as 1st param means unsuppress all events
+
+
+It's important to note that I'm not advertising these suppression methods as a full AOP or IOC API, but rather 
+that those are simply two potentially interesting scenarios this API makes easier to implement. Please
+don't yell at me about how incomplete this suppression API is in terms of complete AOP or IOC coverage. 
+Obviously I understand that there is further abstraction generally desired, but this, like node itself,
+is meant to be a stepping stone to make implementing such abstractions easier.

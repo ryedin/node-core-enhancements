@@ -1,0 +1,7 @@
+I have quite a decent chunk of code from my own frameworks that overlap some of node's APIs, 
+and as I move through them and submit patches for inclusion in node core, this will remain
+my dumping ground for things that get rejected for whatever reason.
+
+I'll try to give clear usage examples under each module's respective folders via READMEs.
+
+I'll also explain a bit of the reasoning given as to why things don't get included into core.
