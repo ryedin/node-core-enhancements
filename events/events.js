@@ -239,11 +239,12 @@ process.EventEmitter.prototype.unsuppress = function(type, bypassRefiring) {
     var currEvent,
         length = this._buffer.length, //cache original length so we can stop the loop at the right spot if events get re-queued (which is possible for some supported cases)
         index = 0,
+        offset = 0,
         mismatches = {}, //a cache to index mismatching types to minimize .indexOf lookups in the loop
         matches = {}; //a cache to index the types after first matching lookup to minimize .indexOf calls in the loop
     while (this._buffer && index < length) {
       if (this._buffer.length > 0) {
-        currEvent = this._buffer[0];
+        currEvent = this._buffer[offset];
         //re-emit the event if type matches one of the passed in types or if we're unsuppressing all
         //note: even though suppress could be re-called during this process,
         //we'll go through the whole loop (up to the original length of the buffer)
@@ -255,12 +256,13 @@ process.EventEmitter.prototype.unsuppress = function(type, bypassRefiring) {
           //cache this type to avoid an indexOf lookup next time the same type is checked
           matches[currEvent.type] = true;
           //take it out of the buffer
-          this._buffer.shift();
+          this._buffer.splice(offset, 1);          
           //finally, re-emit unless told not to at the call level
           !bypassRefiring && process.EventEmitter.prototype.emit.apply(this, currEvent.args);
         } else {
           //mark this event type as a mismatch to avoid unneccesary lookup/checks next time one is found
           mismatches[currEvent.type] = true;
+          offset++;
         }
         if (this._buffer.length == 0) delete this._buffer;
         index++;
