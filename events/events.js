@@ -2,6 +2,7 @@ exports.EventEmitter = process.EventEmitter;
 
 var isArray = Array.isArray;
 
+var _emit = process.EventEmitter.prototype.emit;
 process.EventEmitter.prototype.emit = function (type) {
   // putting this here will allow the 'error' event to be suppressed, which I suppose could be 
   // useful/valid for certain debugging scenarios. If deemed evil to do that, we can simply move this 
@@ -20,65 +21,7 @@ process.EventEmitter.prototype.emit = function (type) {
     return false;
   }
   
-  // If there is no 'error' event listener then throw.
-  if (type === 'error') {
-    if (!this._events || !this._events.error ||
-        (isArray(this._events.error) && !this._events.error.length))
-    {
-      if (arguments[1] instanceof Error) {
-        throw arguments[1];
-      } else {
-        throw new Error("Uncaught, unspecified 'error' event.");
-      }
-      return false;
-    }
-  }
-
-  if (!this._events) return false;
-  if (!this._events[type]) return false;
-
-  if (typeof this._events[type] == 'function') {
-    if (arguments.length < 3) {
-      // fast case
-      this._events[type].call( this
-                             , arguments[1]
-                             , arguments[2]
-                             );
-    } else {
-      // slower
-      var args = Array.prototype.slice.call(arguments, 1);
-      this._events[type].apply(this, args);
-    }
-    //get rid of the listener if it's marked to only execute one time
-    if (this._events[type].__once) this.removeListener(type, this._events[type]);
-    return true;
-
-  } else if (isArray(this._events[type])) {
-    var args = Array.prototype.slice.call(arguments, 1);
-
-    //placeholder in case we need to get rid of 'once' handlers (avoid creating the array if it's never needed)
-    //(don't want to remove them within the loop so-as not to muck with the indices)
-    var oneShotListeners;
-
-    var listeners = this._events[type].slice(0);
-    for (var i = 0, l = listeners.length; i < l; i++) {
-      listeners[i].apply(this, args);
-      if (listeners[i].__once) {
-        oneShotListeners = oneShotListeners || [];
-        oneShotListeners.push(listeners[i]);
-      }
-    }    
-    //get rid of any one-timers
-    if (oneShotListeners) {
-      for (var ii = 0, ll = oneShotListeners.length; ii < ll; ii++) {
-        this.removeListener(type, oneShotListeners[ii]);
-      }
-    }
-    return true;
-
-  } else {
-    return false;
-  }
+  return _emit.call(this, arguments);
 };
 
 // process.EventEmitter is defined in src/node_events.cc
