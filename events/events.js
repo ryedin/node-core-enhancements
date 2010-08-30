@@ -3,7 +3,7 @@ exports.EventEmitter = process.EventEmitter;
 var isArray = Array.isArray;
 
 var _emit = process.EventEmitter.prototype.emit;
-process.EventEmitter.prototype.emit = function (type) {
+process.EventEmitter.prototype.emit = process.EventEmitter.prototype.fire = function (type) {
   // putting this here will allow the 'error' event to be suppressed, which I suppose could be 
   // useful/valid for certain debugging scenarios. If deemed evil to do that, we can simply move this 
   // bit of logic to be after the error event stuff below
@@ -21,37 +21,21 @@ process.EventEmitter.prototype.emit = function (type) {
     return false;
   }
   
-  return _emit.call(this, arguments);
+  return _emit.apply(this, arguments);
 };
 
-// process.EventEmitter is defined in src/node_events.cc
-// process.EventEmitter.prototype.emit() is also defined there.
-process.EventEmitter.prototype.addListener = function (type, listener, fireOnce) {
-  if ('function' !== typeof listener) {
-    throw new Error('addListener only takes instances of Function');
+var _addListener = process.EventEmitter.prototype.addListener;
+process.EventEmitter.prototype.addListener = function (type, listener, fireOnce) {  
+  //AOP the listener to remove itself as soon as it executes
+  var me = this;
+  if (fireOnce === true) {
+    var cb = listener;
+    listener = function() {
+      me.removeListener(type, listener);
+      cb.apply(arguments.callee, arguments);
+    };
   }
-
-  if (!this._events) this._events = {};
-  
-  //attach listener metadata to indicate if it should only execute one time or every time
-  if (fireOnce === true) listener.__once = true; //add underscores to defend against super-edge case of listener already have a .once property
-
-  // To avoid recursion in the case that type == "newListeners"! Before
-  // adding it to the listeners, first emit "newListeners".
-  this.emit("newListener", type, listener);
-
-  if (!this._events[type]) {
-    // Optimize the case of one listener. Don't need the extra array object.
-    this._events[type] = listener;
-  } else if (isArray(this._events[type])) {
-    // If we've already got an array, just append.
-    this._events[type].push(listener);
-  } else {
-    // Adding the second element, need to change to array.
-    this._events[type] = [this._events[type], listener];
-  }
-
-  return this;
+  return _addListener.apply(this, arguments);
 };
 
 process.EventEmitter.prototype.on = process.EventEmitter.prototype.addListener;
@@ -59,44 +43,6 @@ process.EventEmitter.prototype.on = process.EventEmitter.prototype.addListener;
 //convenience method for attaching one-time listeners
 process.EventEmitter.prototype.once = function(type, listener) {
   return this.on(type, listener, true);
-};
-
-process.EventEmitter.prototype.removeListener = function (type, listener) {
-  if ('function' !== typeof listener) {
-    throw new Error('removeListener only takes instances of Function');
-  }
-
-  // does not use listeners(), so no side effect of creating _events[type]
-  if (!this._events || !this._events[type]) return this;
-
-  var list = this._events[type];
-
-  if (isArray(list)) {
-    var i = list.indexOf(listener);
-    if (i < 0) return this;
-    list.splice(i, 1);
-    if (list.length == 0)
-      delete this._events[type];
-  } else if (this._events[type] === listener) {
-    delete this._events[type];
-  }
-
-  return this;
-};
-
-process.EventEmitter.prototype.removeAllListeners = function (type) {
-  // does not use listeners(), so no side effect of creating _events[type]
-  if (type && this._events && this._events[type]) this._events[type] = null;
-  return this;
-};
-
-process.EventEmitter.prototype.listeners = function (type) {
-  if (!this._events) this._events = {};
-  if (!this._events[type]) this._events[type] = [];
-  if (!isArray(this._events[type])) {
-    this._events[type] = [this._events[type]];
-  }
-  return this._events[type];
 };
 
 /**
@@ -215,13 +161,6 @@ process.EventEmitter.prototype.unsuppress = function(type, bypassRefiring) {
     }
   }
 };
-
-exports.Promise = function removed () {
-  throw new Error(
-    'Promise has been removed. See '+
-    'http://groups.google.com/group/nodejs/msg/0c483b891c56fea2 for more information.');
-}
-process.Promise = exports.Promise;
 
 /**
  * Convert array-like object to an Array.
