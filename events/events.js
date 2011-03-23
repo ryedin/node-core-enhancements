@@ -28,7 +28,7 @@ var _addListener = process.EventEmitter.prototype.addListener;
 process.EventEmitter.prototype.addListener = function (type, listener, fireOnce) {  
   //increase node's default "max listeners" setting to something more sensible, like 1000 (yes, that's more sensible)
   if (!this._events) this._events = {};
-  if (this._events.maxListeners !== undefined) {
+  if (this._events.maxListeners === undefined) {
     this._events.maxListeners = 1000;
   }
   //AOP the listener to remove itself as soon as it executes if fireOnce is specified
