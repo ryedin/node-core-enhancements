@@ -20,8 +20,19 @@ process.EventEmitter.prototype.emit = process.EventEmitter.prototype.fire = func
     }
     return false;
   }
+  var args = toArray(arguments);
+  var arg1 = args.length == 2 ? 
+    (args[1] !== undefined ? args[1] : {sender: this}) : 
+    {sender: this};
+  if (args.length == 2 && args[1] === undefined) {
+    args[1] = arg1;
+  }
+  if (!arg1.sender && typeof arg1 === "object") {
+    arg1.sender = this;
+  }
+  if (args.length == 1) args.push(arg1);
   
-  return _emit.apply(this, arguments);
+  return _emit.apply(this, args);
 };
 
 var _addListener = process.EventEmitter.prototype.addListener;
