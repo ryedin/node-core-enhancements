@@ -36,7 +36,7 @@ process.EventEmitter.prototype.emit = process.EventEmitter.prototype.fire = func
 };
 
 var _addListener = process.EventEmitter.prototype.addListener;
-process.EventEmitter.prototype.addListener = function (type, listener, fireOnce) {  
+process.EventEmitter.prototype.addListener = function (type, listener, disposable) {  
   //increase node's default "max listeners" setting to something more sensible, like 1000 (yes, that's more sensible)
   if (!this._events) this._events = {};
   if (this._events.maxListeners === undefined) {
@@ -44,12 +44,13 @@ process.EventEmitter.prototype.addListener = function (type, listener, fireOnce)
   }
   //AOP the listener to remove itself as soon as it executes if fireOnce is specified
   var me = this;
-  if (fireOnce === true) {
-    var cb = listener;
-    listener = function() {
+  if (disposable && typeof disposable.on === "function") {
+    //NOTE: for the sake of this functionality, a "disposable" is an object that's expected to fire a "disposed" event when being disposed
+    //this allows you to pass in an object that may dispose and have the event handler cleanup be done
+    //automatically for you.
+    disposable.once("disposed", function() {
       me.removeListener(type, listener);
-      cb.apply(arguments.callee, arguments);
-    };
+    });
   }
   return _addListener.apply(this, arguments);
 };
@@ -57,8 +58,14 @@ process.EventEmitter.prototype.addListener = function (type, listener, fireOnce)
 process.EventEmitter.prototype.on = process.EventEmitter.prototype.addListener;
 
 //convenience method for attaching one-time listeners
-process.EventEmitter.prototype.once = function(type, listener) {
-  return this.on(type, listener, true);
+process.EventEmitter.prototype.once = function(type, listener, disposable) {
+  var me = this;
+  var cb = listener;
+  listener = function() {
+    me.removeListener(type, listener);
+    cb.apply(arguments.callee, arguments);
+  };
+  return this.on(type, listener, disposable);
 };
 
 /**
