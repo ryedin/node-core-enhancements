@@ -74,7 +74,6 @@ player.unsuppress(); //passing nothing or null as 1st param means unsuppress all
 
 
 It's important to note that I'm not advertising these suppression methods as a full AOP or IOC API, but rather 
-that those are simply two potentially interesting scenarios this API makes easier to implement. Please
-don't yell at me about how incomplete this suppression API is in terms of complete AOP or IOC coverage. 
+that those are simply two potentially interesting scenarios this API makes easier to implement.  
 Obviously I understand that there is further abstraction generally desired, but this, like node itself,
 is meant to be a stepping stone to make implementing such abstractions easier.
